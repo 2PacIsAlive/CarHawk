@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+import os
+os.system('clear')
+
+from multiprocessing import Process, Queue
+from sys  import argv
+from glob import glob
+from PIL  import Image
+
+def loadData(category, img, all_img_data):
+	print 'loaded', img, 'from class', category
+	all_img_data.put((category, img, list(Image.open(img).getdata())))
+	return
+	
+def main(args):
+	'''
+	'''
+	if args:
+		print 'Using args:', args, 'lolright'	
+
+	train_data    = dict()
+	test_data     = dict()
+	train_data_q  = Queue()	
+	test_data_q   = Queue()	
+
+	for category in glob('/home/drivers/CarHawk/train/*'): 
+		for img_file in glob(category + '/*'):
+			image_loader = Process(target=loadData, args=(category[-2:], img_file, train_data))
+			print img_file
+			image_loader.start()
+			train_data[category[-2:]].append(train_data_q.get())
+			image_loader.join() # wait till process is finished by blocking the calling thread until the image_loader terminates
+	for img_file in glob('/home/drivers/CarHawk/test/*'):
+		image_loader = Process(target=loadData, args=('test', img_file, test_data))
+    		image_loader.start()
+    		image_loader.join()
+	os.system('clear')
+	print 'All data loaded!'
+	print 'training shape:', train_data.shape()  
+	print 'testing shape:',  test_data.shape()  
+	print 'image shape:',    training_data[0][2].shape()
+	print 'random pixel:',   training_data[0][2][random.randint(len(training_data[0][2]))]
+	
+if __name__=='__main__': main(argv[1:]) 
+
