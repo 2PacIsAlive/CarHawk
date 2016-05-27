@@ -7,11 +7,12 @@ from multiprocessing import Process, Queue
 from sys  import argv
 from glob import glob
 from PIL  import Image
+from time import time
+from json import dump, dumps
 
 def loadData(category, img, all_img_data):
-	print 'loaded', img, 'from class', category
-	all_img_data.put((category, img, list(Image.open(img).getdata())))
-	return
+	print 'loaded', img[35:-4], 'from class', category 
+	all_img_data.put(list(Image.open(img).getdata()))
 	
 def main(args):
 	'''
@@ -19,18 +20,25 @@ def main(args):
 	if args:
 		print 'Using args:', args, 'lolright'	
 
-	train_data    = dict()
+	train_data    = dict.fromkeys(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'], dict())
 	test_data     = dict()
 	train_data_q  = Queue()	
 	test_data_q   = Queue()	
 
 	for category in glob('/home/drivers/CarHawk/train/*'): 
 		for img_file in glob(category + '/*'):
-			image_loader = Process(target=loadData, args=(category[-2:], img_file, train_data))
-			print img_file
+			image_loader = Process(target=loadData, args=(category[-2:], img_file, train_data_q))
+			t1 = time()
 			image_loader.start()
-			train_data[category[-2:]].append(train_data_q.get())
+			#train_data[category[-2:]][img_file[34:-4]] = train_data_q.get()			
+			with open('/home/drivers/CarHawk/preprocessing/' + category[-2:] + '/' + img_file[35:-4] + '.txt', 'w') as img_txt:
+				for rgb in train_data_q.get():
+					for val in rgb:
+						img_txt.write(str(val) + ',')
+					img_txt.write('\n')
 			image_loader.join() # wait till process is finished by blocking the calling thread until the image_loader terminates
+			t2 = time()
+			print 'walltime:', t2 - t1
 	for img_file in glob('/home/drivers/CarHawk/test/*'):
 		image_loader = Process(target=loadData, args=('test', img_file, test_data))
     		image_loader.start()
