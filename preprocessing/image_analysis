@@ -15,10 +15,11 @@ def loadData(category, img, all_img_data):
 	all_img_data.put(list(Image.open(img).getdata()))
 	
 def main(args):
+#class Loader:
 	'''
 	'''
-	if args:
-		print 'Using args:', args, 'lolright'	
+	#if args:
+	#	print 'Using args:', args, 'lolright'	
 
 	train_data    = dict.fromkeys(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'], dict())
 	test_data     = dict()

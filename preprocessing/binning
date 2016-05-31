@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+
+from glob import glob
+import pandas
+import numpy
+
+def read_file(fname):
+	with open(fname, 'r') as fo:
+		return pandas.read_csv(fo, header=None)
+
+def load_files():
+	train_data = dict.fromkeys(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'], dict())	
+	for category in glob('/home/drivers/CarHawk/train/*'):
+		for image in glob(category + '/*'):
+			train_data[image[28:30]][image[35:-4]] = read_file(image)
+	return train_data
+
+def main():
+	load_files()
+
+if __name__=='__main__': main()
