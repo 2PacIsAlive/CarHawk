@@ -5,6 +5,7 @@ import pandas
 import numpy
 
 def read_file(fname):
+	print "reading" + fname
 	with open(fname, 'r') as fo:
 		return pandas.read_csv(fo, header=None)
 
