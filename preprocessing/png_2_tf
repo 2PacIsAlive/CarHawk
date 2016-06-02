@@ -1,0 +1,44 @@
+#!/usr/bin/env python2
+
+'''
+adapted from https://github.com/HamedMP/ImageFlow/blob/master/example_project/input_data.py
+'''
+
+import imageflow 
+import numpy
+import glob
+import PIL
+import os
+
+IMAGE_DIRECTORY = '/home/jared/CarHawk/images' 
+
+def load_images_from(image_dir):
+	# TODO training images
+	images = []
+	png_files = glob.glob(os.path.join(image_dir, 'test/', '*.png'))
+	
+	for filepath in png_files:
+		img = PIL.Image.open(filepath).getdata()
+		img = numpy.asarray(img, numpy.uint8)
+		name = filepath.split('/')[-1].split('.')[0] # extract filename from path		
+
+		print 'loaded', name
+		images.append([int(name), img]) # must convert images to numerical names first e.g. '100001.png'
+
+	images = sorted(images, key = lambda img: img[0]) # sort by name
+
+	training = [] 
+	
+	validation = numpy.array([numpy.asarray(img[1], numpy.uint8) for img in images]) # ditch the labels
+
+	return training, validation
+
+def load_labels_from(image_dir):
+	labels = pandas.read_csv(os.path.join(image_dir, 'driver_imgs_list.csv'))
+	print labels
+
+def main():
+	training_data, validation_data = load_images_from(IMAGE_DIRECTORY)
+	training_labels = load_labels_from(IMAGE_DIRECTORY)
+
+if __name__=='__main__': main()
