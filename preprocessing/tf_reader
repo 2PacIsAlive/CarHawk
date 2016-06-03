@@ -3,12 +3,77 @@
 '''
 adapted from https://github.com/HamedMP/ImageFlow/blob/master/example_project/input_data.py
 '''
+import tensorflow as tf
+import imageflow
+import glob
+import os
 
-import tensorflow
-import sys
+DATA_DIRECTORY = '/home/jared/CarHawk/data' 
 
-IMAGE_DIRECTORY = '/home/jared/CarHawk/images' 
+def read_images(path):
+	print 'reading images from', path
+	images     = []
+	reader     = tf.WholeFileReader()
+	png_files  = glob.glob(os.path.join(path, '*.png'))
+	png_file_q = tf.train.string_input_producer(png_files)
+	pkey, pval = reader.read(png_file_q)
+	p_image    = tf.image.decode_png(pval)
+	
+	with tf.Session() as sess:
+		coord   = tf.train.Coordinator()
+		threads	= tf.train.start_queue_runners(coord=coord)
+		for i in range(len(png_files)):
+			png = p_image.eval()
+			images.append(png)
+		coord.request_stop()
+		coord.join(threads)
+	return images
 
-	convert_to_tf(IMAGE_DIRECTORY)
+def read_and_decode(filename_queue):
+	'''
+	reader = tensorflow.TFRecordReader()
+	_, serialized_example = reader.read(filename_queue)
+	features = tensorflow.parse_single_example(serialized_example,
+                                     dense_keys=['image_raw', 'label'],
+                                     # Defaults are not specified since both keys are required.
+                                     dense_types=[tensorflow.string, tensorflow.int64])
+
+	# Convert from a scalar string tensor to a uint8 tensor
+	image = tensorflow.decode_raw(features['image_raw'], tf.uint8)
+
+	#image = tensorflow.reshape(image, [my_cifar.n_input])
+	#image.set_shape([my_cifar.n_input])
+
+	# Convert label from a scalar uint8 tensor to an int32 scalar.
+	label = tensorflow.cast(features['label'], tensorflow.int32)
+
+	return image, label
+	'''
+	images, labels = imageflow.inputs(filename=os.path.join(DATA_DIRECTORY, 'training.tfrecords'), batch_size=128,
+                                      num_epochs=10000,
+                                      num_threads=5, imshape=[640, 480, 3])
+	val_images, val_labels = imageflow.inputs(filename=os.path.join(DATA_DIRECTORY, 'validation.tfrecords'), batch_size=128,
+                                    num_epochs=10000,
+                                    num_threads=5, imshape=[640, 480, 3])
+
+	print images 
+	print labels
+	print val_images
+	print val_labels
+
+def main():
+	#files = [os.path.join(DATA_DIRECTORY, 'training.tfrecords')]
+	#read_and_decode(files)	
+	validation = read_images('/home/jared/CarHawk/images/test_all/')
+	train_c0   = read_images('/home/jared/CarHawk/images/train_all/c0')
+	train_c1   = read_images('/home/jared/CarHawk/images/train_all/c1')
+	train_c2   = read_images('/home/jared/CarHawk/images/train_all/c2')
+	train_c3   = read_images('/home/jared/CarHawk/images/train_all/c3')
+	train_c4   = read_images('/home/jared/CarHawk/images/train_all/c4')
+	train_c5   = read_images('/home/jared/CarHawk/images/train_all/c5')
+	train_c6   = read_images('/home/jared/CarHawk/images/train_all/c6')
+	train_c7   = read_images('/home/jared/CarHawk/images/train_all/c7')
+	train_c8   = read_images('/home/jared/CarHawk/images/train_all/c8')
+	train_c9   = read_images('/home/jared/CarHawk/images/train_all/c9')
 
 if __name__=='__main__': main()
