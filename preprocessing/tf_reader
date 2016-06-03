@@ -1,0 +1,14 @@
+#!/usr/bin/env python2
+
+'''
+adapted from https://github.com/HamedMP/ImageFlow/blob/master/example_project/input_data.py
+'''
+
+import tensorflow
+import sys
+
+IMAGE_DIRECTORY = '/home/jared/CarHawk/images' 
+
+	convert_to_tf(IMAGE_DIRECTORY)
+
+if __name__=='__main__': main()

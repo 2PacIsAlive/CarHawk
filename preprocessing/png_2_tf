@@ -4,41 +4,142 @@
 adapted from https://github.com/HamedMP/ImageFlow/blob/master/example_project/input_data.py
 '''
 
+import tensorflow
 import imageflow 
+import pandas
 import numpy
 import glob
 import PIL
+import sys
 import os
 
 IMAGE_DIRECTORY = '/home/jared/CarHawk/images' 
 
-def load_images_from(image_dir):
-	# TODO training images
+def _get_pixel_data_for(files):	
 	images = []
-	png_files = glob.glob(os.path.join(image_dir, 'test/', '*.png'))
-	
-	for filepath in png_files:
-		img = PIL.Image.open(filepath).getdata()
+	labels = []
+	count = 0
+	total_size = len(files)
+	for filepath in files:
+		sys.stdout.write('\r>> Loaded %s %.1f%%' % (filepath,
+			float(count) / float(total_size) * 100.0))
+		sys.stdout.flush()
+		img = PIL.Image.open(filepath)		
 		img = numpy.asarray(img, numpy.uint8)
 		name = filepath.split('/')[-1].split('.')[0] # extract filename from path		
 
-		print 'loaded', name
-		images.append([int(name), img]) # must convert images to numerical names first e.g. '100001.png'
+		labels.append(name)
+		images.append(img) 
+		count += 1
+	print
+	return zip(images, labels)
+	#return sorted(images, key = lambda img: img[0]) # sort by name
 
-	images = sorted(images, key = lambda img: img[0]) # sort by name
+def _label_to_int(labels):
+	categories = ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9']
+	return [categories.index(label) for label in labels['classname']]
 
-	training = [] 
-	
-	validation = numpy.array([numpy.asarray(img[1], numpy.uint8) for img in images]) # ditch the labels
+def _dense_to_one_hot(labels_dense, num_classes):
+	'''
+	Convert class labels from scalars to one-hot vectors
+	'''
+	num_labels = labels_dense.shape[0]
+	index_offset = np.arange(num_labels) * num_classes
+	labels_one_hot = np.zeros((num_labels, num_classes))
+	labels_one_hot.flat[index_offset + labels_dense.ravel()] = 1
+	print(labels_one_hot[0])
+	return labels_one_hot
 
-	return training, validation
+def _int64_feature(value):
+	return tensorflow.train.Feature(int64_list=tensorflow.train.Int64List(value=[value]))
+
+def _bytes_feature(value):
+	return tensorflow.train.Feature(bytes_list=tensorflow.train.BytesList(value=[value]))
+
+def load_images_from(image_dir, label_dict):
+	training_pngs     = glob.glob(os.path.join(image_dir, 'train/', '*', '*.png'))
+	validation_pngs   = glob.glob(os.path.join(image_dir, 'test/', '*.png'))
+	print validation_pngs
+	training_images   = _get_pixel_data_for(training_pngs)
+	validation_images = _get_pixel_data_for(validation_pngs)
+
+	# convert image id's to class labels
+	labels = _label_to_int({'classname': [label_dict[image_id] for image, image_id in training_images]})
+
+	# ditch the image ids
+	training   = numpy.array([numpy.asarray(img[0], numpy.uint8) for img in training_images])
+	validation = numpy.array([numpy.asarray(img[0], numpy.uint8) for img in validation_images]) 
+
+	return numpy.array(labels, dtype=numpy.uint32), training, validation
 
 def load_labels_from(image_dir):
-	labels = pandas.read_csv(os.path.join(image_dir, 'driver_imgs_list.csv'))
-	print labels
+	labels = pandas.read_csv(os.path.join(image_dir, 'driver_imgs_list.csv')) 
+	# make the filenames numerical  
+	for idx, filename in enumerate(labels['img']):
+		labels['img'][idx] = filename.split('_')[-1].split('.')[0] # just the id
+	
+	labels.drop('subject', axis=1, inplace=True) # ditch the subject id
+	
+	# TODO better way to sort inplace with pandas?
+	# convert to list of tuples for sorting
+	#labels = sorted(zip(labels['img'], labels['classname']), key = lambda label: int(label[0]))
+	
+	label_dict = {}
+	for idx in range(len(labels['img'])):
+		label_dict[labels['img'][idx]] = labels['classname'][idx]	
+
+	return label_dict
+
+def convert_to_tf(directory):
+	label_dict = load_labels_from(directory)
+	training_labels, training_data, validation_data = load_images_from(directory, label_dict)
+	
+	print training_labels.shape	
+	print training_data.shape	
+	print validation_data.shape	
+	
+	num_training_images   = training_data.shape[0]
+	num_validation_images = validation_data.shape[0]
+	num_train_examples    = training_labels.shape[0]
+	
+	print 'training images shape:',  num_training_images
+	print 'training labels shape:',  num_train_examples
+	print 'validation images shape', num_validation_images
+
+	train_rows     = training_data.shape[1]
+	train_cols     = training_data.shape[2]
+	train_depth    = training_data.shape[3]
+	validate_rows  = validation_data.shape[1]
+	validate_cols  = validation_data.shape[2]
+	validate_depth = validation_data.shape[3]
+
+	training_filename   = os.path.join('data', 'training.tfrecords')
+	validation_filename = os.path.join('data', 'validation.tfrecords')
+	training_writer     = tensorflow.python_io.TFRecordWriter(os.path.join('data', 'training.tfrecords'))
+	validation_writer   = tensorflow.python_io.TFRecordWriter(os.path.join('data', 'validation.tfrecords'))
+
+	for idx in range(num_train_examples):
+		image_raw = training_data[idx].tostring()
+		example = tensorflow.train.Example(features=tensorflow.train.Features(feature={
+			'height': _int64_feature(train_rows),
+			'width':  _int64_feature(train_cols),
+			'depth':  _int64_feature(train_depth),
+			'label':  _int64_feature(int(training_labels[idx])),
+			'image_raw': _bytes_feature(image_raw)}))
+		training_writer.write(example.SerializeToString())
+	
+	for idx in range(num_validation_images):
+		image_raw = validation_data[idx].tostring()
+		example = tensorflow.train.Example(features=tensorflow.train.Features(feature={
+			'height': _int64_feature(validate_rows),
+			'width':  _int64_feature(validate_cols),
+			'depth':  _int64_feature(validate_depth),
+			'image_raw': _bytes_feature(image_raw)}))
+		validation_writer.write(example.SerializeToString())
+	
+	print 'all data written to', training_filename, 'and', validation_filename
 
 def main():
-	training_data, validation_data = load_images_from(IMAGE_DIRECTORY)
-	training_labels = load_labels_from(IMAGE_DIRECTORY)
+	convert_to_tf(IMAGE_DIRECTORY)
 
 if __name__=='__main__': main()
