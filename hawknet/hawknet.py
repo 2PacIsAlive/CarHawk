@@ -250,7 +250,7 @@ def read_and_decode(filename_queue):
 	# length mnist.IMAGE_PIXELS) to a uint8 tensor with shape
 	# [mnist.IMAGE_PIXELS].
 	image = tf.decode_raw(features['image_raw'], tf.uint8)
-	image.set_shape([921600])
+	image.set_shape([57600])
 
 	# OPTIONAL: Could reshape into a 28x28 image and apply distortions
 	# here.  Since we are not applying any distortions in this
@@ -263,7 +263,7 @@ def read_and_decode(filename_queue):
 	# Convert label from a scalar uint8 tensor to an int32 scalar.
 	label = tf.cast(features['label'], tf.int32)
 
-	return tf.reshape(image, [480, 640, 3]), label # TODO doublecheck this
+	return tf.reshape(image, [160, 120, 3]), label # TODO doublecheck this
 
 def inputs(validate, data_dir, batch_size):
   	"""Construct input using the Reader ops.
@@ -279,7 +279,7 @@ def inputs(validate, data_dir, batch_size):
   	"""
 	if not validate:
 		filenames = [os.path.join(data_dir, 'train_c%d.tfrecords' % i)
-                 for i in xrange(0, 3)] # TODO all training cats
+                 for i in xrange(0, 10)] 
 		num_examples_per_epoch = 500
 	else:
 		filenames = [os.path.join(data_dir, 'validation.tfrecords')]
