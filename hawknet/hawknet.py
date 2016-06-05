@@ -2,6 +2,16 @@
 
 import tensorflow as tf
 import os
+import re
+
+BATCH_SIZE = 1 # TODO make FLAGS
+NUM_CLASSES = 10
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 504
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 504
+MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
+NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
+LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
+INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
 def _variable_on_cpu(name, shape, initializer):
   	"""Helper to create a Variable stored on CPU memory.
@@ -54,9 +64,36 @@ def _activation_summary(x):
   	"""
   	# Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
   	# session. This helps the clarity of presentation on tensorboard.
-  	tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
+  	tensor_name = re.sub('%s_[0-9]*/' % 'tower', '', x.op.name)
   	tf.histogram_summary(tensor_name + '/activations', x)
   	tf.scalar_summary(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
+
+def _add_loss_summaries(total_loss):
+  	"""Add summaries for losses in CIFAR-10 model.
+
+  	Generates moving average for all losses and associated summaries for
+  	visualizing the performance of the network.
+
+  	Args:
+    	total_loss: Total loss from loss().
+  	Returns:
+    	loss_averages_op: op for generating moving averages of losses.
+  	"""
+  	# Compute the moving average of all individual losses and the total loss.
+  	loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
+  	losses = tf.get_collection('losses')
+  	loss_averages_op = loss_averages.apply(losses + [total_loss])
+
+  	# Attach a scalar summary to all individual losses and the total loss; do the
+  	# same for the averaged version of the losses.
+  	for l in losses + [total_loss]:
+		# Name each loss as '(raw)' and name the moving average version of the loss
+		# as the original loss name.
+		tf.scalar_summary(l.op.name +' (raw)', l)
+		tf.scalar_summary(l.op.name, loss_averages.average(l))
+
+  	return loss_averages_op
+
 
 def _generate_image_and_label_batch(image, label, min_queue_examples,
                                     batch_size, shuffle):
@@ -148,7 +185,7 @@ def inference(images):
 	# local3
 	with tf.variable_scope('local3') as scope:
 		# Move everything into depth so we can perform a single matrix multiply.
-		reshape = tf.reshape(pool2, [FLAGS.batch_size, -1])
+		reshape = tf.reshape(pool2, [BATCH_SIZE, -1])
 		dim = reshape.get_shape()[1].value
 		weights = _variable_with_weight_decay('weights', shape=[dim, 384],
 										  stddev=0.04, wd=0.004)
@@ -213,7 +250,7 @@ def read_and_decode(filename_queue):
 	# length mnist.IMAGE_PIXELS) to a uint8 tensor with shape
 	# [mnist.IMAGE_PIXELS].
 	image = tf.decode_raw(features['image_raw'], tf.uint8)
-	image.set_shape([32])
+	image.set_shape([921600])
 
 	# OPTIONAL: Could reshape into a 28x28 image and apply distortions
 	# here.  Since we are not applying any distortions in this
@@ -226,7 +263,7 @@ def read_and_decode(filename_queue):
 	# Convert label from a scalar uint8 tensor to an int32 scalar.
 	label = tf.cast(features['label'], tf.int32)
 
-	return image, label
+	return tf.reshape(image, [480, 640, 3]), label # TODO doublecheck this
 
 def inputs(validate, data_dir, batch_size):
   	"""Construct input using the Reader ops.
@@ -242,7 +279,7 @@ def inputs(validate, data_dir, batch_size):
   	"""
 	if not validate:
 		filenames = [os.path.join(data_dir, 'train_c%d.tfrecords' % i)
-                 for i in xrange(0, 5)] # TODO all training cats
+                 for i in xrange(0, 3)] # TODO all training cats
 		num_examples_per_epoch = 500
 	else:
 		filenames = [os.path.join(data_dir, 'validation.tfrecords')]
@@ -283,4 +320,57 @@ def inputs(validate, data_dir, batch_size):
   	return _generate_image_and_label_batch(float_image, label,
                                          min_queue_examples, batch_size,
                                          shuffle=True)
+def train(total_loss, global_step):
+  	"""Train HawkNet model.
 
+  	Create an optimizer and apply to all trainable variables. Add moving
+  	average for all trainable variables.
+
+  	Args:
+    	total_loss: Total loss from loss().
+    	global_step: Integer Variable counting the number of training steps
+      		processed.
+  	Returns:
+    	train_op: op for training.
+  	"""
+  	# Variables that affect learning rate.
+  	num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / BATCH_SIZE
+  	decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
+
+  	# Decay the learning rate exponentially based on the number of steps.
+  	lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
+                                  global_step,
+                                  decay_steps,
+                                  LEARNING_RATE_DECAY_FACTOR,
+                                  staircase=True)
+  	tf.scalar_summary('learning_rate', lr)
+
+  	# Generate moving averages of all losses and associated summaries.
+  	loss_averages_op = _add_loss_summaries(total_loss)
+
+  	# Compute gradients.
+	with tf.control_dependencies([loss_averages_op]):
+		opt = tf.train.GradientDescentOptimizer(lr)
+    	grads = opt.compute_gradients(total_loss)
+
+  	# Apply gradients.
+  	apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
+
+  	# Add histograms for trainable variables.
+	for var in tf.trainable_variables():
+		tf.histogram_summary(var.op.name, var)
+
+  	# Add histograms for gradients.
+	for grad, var in grads:
+		if grad is not None:
+			tf.histogram_summary(var.op.name + '/gradients', grad)
+
+  	# Track the moving averages of all trainable variables.
+  	variable_averages = tf.train.ExponentialMovingAverage(
+    	MOVING_AVERAGE_DECAY, global_step)
+  	variables_averages_op = variable_averages.apply(tf.trainable_variables())
+
+	with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
+		train_op = tf.no_op(name='train')
+
+  	return train_op
