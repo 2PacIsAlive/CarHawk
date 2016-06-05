@@ -81,7 +81,7 @@ def read_and_decode(filename_queue):
 	# length mnist.IMAGE_PIXELS) to a uint8 tensor with shape
 	# [mnist.IMAGE_PIXELS].
 	image = tf.decode_raw(features['image_raw'], tf.uint8)
-	image.set_shape([480])
+	image.set_shape([32])
 
 	# OPTIONAL: Could reshape into a 28x28 image and apply distortions
 	# here.  Since we are not applying any distortions in this
@@ -123,13 +123,32 @@ def main():
 	#train_c2   = read_images('/home/jared/CarHawk/images/train_all/c2')
 	#train_c3   = read_images('/home/jared/CarHawk/images/train_all/c3')
 	#train_c4   = read_images('/home/jared/CarHawk/images/train_all/c4')
-	#train_c5   = read_images('/home/jared/CarHawk/images/train_all/c5')
-	#train_c6   = read_images('/home/jared/CarHawk/images/train_all/c6')
-	#train_c7   = read_images('/home/jared/CarHawk/images/train_all/c7')
-	#train_c8   = read_images('/home/jared/CarHawk/images/train_all/c8')
-	#train_c9   = read_images('/home/jared/CarHawk/images/train_all/c9')
+	train_c5   = read_images('/home/jared/CarHawk/images/train_all/c5')
+	train_c6   = read_images('/home/jared/CarHawk/images/train_all/c6')
+	train_c7   = read_images('/home/jared/CarHawk/images/train_all/c7')
+	train_c8   = read_images('/home/jared/CarHawk/images/train_all/c8')
+	train_c9   = read_images('/home/jared/CarHawk/images/train_all/c9')
 	
 	#convert_to(numpy.array(train_c0), numpy.array([0 for i in range(len(train_c0))]), 'train_c0')
-	print inputs(os.path.join(DATA_DIRECTORY, 'train_c0.tfrecords'), 128, 10) 
+	#convert_to(numpy.array(train_c1), numpy.array([1 for i in range(len(train_c1))]), 'train_c1')
+	#convert_to(numpy.array(train_c2), numpy.array([2 for i in range(len(train_c2))]), 'train_c2')
+	#convert_to(numpy.array(train_c3), numpy.array([3 for i in range(len(train_c3))]), 'train_c3')
+	#convert_to(numpy.array(train_c4), numpy.array([4 for i in range(len(train_c4))]), 'train_c4')
+	convert_to(numpy.array(train_c5), numpy.array([5 for i in range(len(train_c5))]), 'train_c5')
+	convert_to(numpy.array(train_c6), numpy.array([6 for i in range(len(train_c6))]), 'train_c6')
+	convert_to(numpy.array(train_c7), numpy.array([7 for i in range(len(train_c7))]), 'train_c7')
+	convert_to(numpy.array(train_c8), numpy.array([8 for i in range(len(train_c8))]), 'train_c8')
+	convert_to(numpy.array(train_c9), numpy.array([9 for i in range(len(train_c9))]), 'train_c9')
+	
+	#print inputs(os.path.join(DATA_DIRECTORY, 'train_c0.tfrecords'), 128, 2) 
+	#print inputs(os.path.join(DATA_DIRECTORY, 'train_c1.tfrecords'), 128, 2) 
+	#print inputs(os.path.join(DATA_DIRECTORY, 'train_c2.tfrecords'), 128, 2) 
+	#print inputs(os.path.join(DATA_DIRECTORY, 'train_c3.tfrecords'), 128, 2) 
+	#print inputs(os.path.join(DATA_DIRECTORY, 'train_c4.tfrecords'), 128, 2) 
+	print inputs(os.path.join(DATA_DIRECTORY, 'train_c5.tfrecords'), 128, 2) 
+	print inputs(os.path.join(DATA_DIRECTORY, 'train_c6.tfrecords'), 128, 2) 
+	print inputs(os.path.join(DATA_DIRECTORY, 'train_c7.tfrecords'), 128, 2) 
+	print inputs(os.path.join(DATA_DIRECTORY, 'train_c8.tfrecords'), 128, 2) 
+	print inputs(os.path.join(DATA_DIRECTORY, 'train_c9.tfrecords'), 128, 2) 
 
 if __name__=='__main__': main()
