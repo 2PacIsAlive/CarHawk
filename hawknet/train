@@ -1,0 +1,85 @@
+#!/usr/bin/env python2
+
+'''
+adapted from https://github.com/tensorflow/tensorflow/blob/master/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py
+'''
+
+import sys
+sys.path.append('/home/jared/CarHawk/')
+
+from preprocessing.tf_read_and_write import inputs as tf_inputs
+import tensorflow as tf
+import hawknet
+import time
+
+# TODO FLAGS
+LEARNING_RATE = 0.01 
+NUM_EPOCHS = 100
+
+def run_training():
+	"""Train HawkNet for a number of steps."""
+
+	# Tell TensorFlow that the model will be built into the default Graph.
+	with tf.Graph().as_default():
+		# Input images and labels.
+		images, labels = hawknet.inputs(validate   = False, 
+										data_dir   = '/home/jared/CarHawk/data/', 
+										batch_size = 1)
+
+		# Build a Graph that computes predictions from the inference model.
+		logits = hawknet.inference(images)
+
+		# Add to the Graph the loss calculation.
+		loss = hawknet.loss(logits, labels)
+
+		# Add to the Graph operations that train the model.
+		#train_op = hawknet.train(loss, LEARNING_RATE)
+		train_op = hawknet.train(loss, tf.Variable(LEARNING_RATE, name='learning_rate'))
+
+		# The op for initializing the variables.
+		init_op = tf.initialize_all_variables()
+
+		# Create a session for running operations in the Graph.
+		sess = tf.Session()
+
+		# Initialize the variables (the trained variables and the
+		# epoch counter).
+		sess.run(init_op)
+
+		# Start input enqueue threads.
+		coord = tf.train.Coordinator()
+		threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    	try:
+      		step = 0
+      		while not coord.should_stop():
+        		start_time = time.time()
+
+				# Run one step of the model.  The return values are
+        		# the activations from the `train_op` (which is
+        		# discarded) and the `loss` op.  To inspect the values
+        		# of your ops or variables, you may include them in
+        		# the list passed to sess.run() and the value tensors
+        		# will be returned in the tuple from the call.
+        		_, loss_value = sess.run([train_op, loss])
+
+        		duration = time.time() - start_time
+
+        		# Print an overview fairly often.
+        		if step % 100 == 0:
+          			print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value,
+                                                     duration))
+        		step += 1
+    	except tf.errors.OutOfRangeError:
+      		print('Done training for %d epochs, %d steps.' % (NUM_EPOCHS, step))
+    	finally:
+      		# When done, ask the threads to stop.
+      		coord.request_stop()
+
+    	# Wait for threads to finish.
+    	coord.join(threads)
+    	sess.close()
+
+def main(_): run_training()
+
+if __name__=='__main__': tf.app.run()
