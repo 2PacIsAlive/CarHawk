@@ -4,7 +4,7 @@ import tensorflow as tf
 import os
 import re
 
-BATCH_SIZE = 1 # TODO make FLAGS
+BATCH_SIZE = 10 # TODO make FLAGS
 NUM_CLASSES = 10
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 504
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 504
@@ -94,6 +94,17 @@ def _add_loss_summaries(total_loss):
 
   	return loss_averages_op
 
+def _generate_image_and_label_for_test(image, label):
+	images, label_batch = tf.train.batch(
+		[image, label],
+		batch_size=1, # number of test images
+		num_threads=16,
+		capacity=1)
+
+  	# Display the training images in the visualizer.
+  	tf.image_summary('images', images)
+
+  	return images, tf.reshape(label_batch, [1])
 
 def _generate_image_and_label_batch(image, label, min_queue_examples,
                                     batch_size, shuffle):
@@ -261,9 +272,22 @@ def read_and_decode(filename_queue):
 	image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
 
 	# Convert label from a scalar uint8 tensor to an int32 scalar.
-	label = tf.cast(features['label'], tf.int32)
+	#label = tf.cast(features['label'], tf.int32) <-- placeholder instead
 
-	return tf.reshape(image, [160, 120, 3]), label # TODO doublecheck this
+	return tf.reshape(image, [160, 120, 3]), tf.placeholder(tf.int32) # TODO doublecheck this
+
+def validation_input(image_path):
+	if not tf.gfile.Exists(image_path):
+		raise ValueError('Failed to find file: ' + image_path)
+
+  	# Create a queue that produces the filename to read.
+  	with tf.name_scope('input'):
+		filename_queue = tf.train.string_input_producer(image_path)
+
+  	# Read example from file in the filename queue.
+  	float_image, label = read_and_decode(filename_queue)
+	
+	return _generate_image_and_label_for_test(float_image, label)
 
 def inputs(validate, data_dir, batch_size):
   	"""Construct input using the Reader ops.
@@ -280,10 +304,10 @@ def inputs(validate, data_dir, batch_size):
 	if not validate:
 		filenames = [os.path.join(data_dir, 'train_c%d.tfrecords' % i)
                  for i in xrange(0, 10)] 
-		num_examples_per_epoch = 500
+		num_examples_per_epoch = 504
 	else:
 		filenames = [os.path.join(data_dir, 'validation.tfrecords')]
-    	num_examples_per_epoch = 500
+    	num_examples_per_epoch = 504
 
 	for f in filenames:
 		if not tf.gfile.Exists(f):
@@ -316,10 +340,14 @@ def inputs(validate, data_dir, batch_size):
   	min_queue_examples = int(num_examples_per_epoch *
                            min_fraction_of_examples_in_queue)
 
-  	# Generate a batch of images and labels by building up a queue of examples.
-  	return _generate_image_and_label_batch(float_image, label,
+	if not validate:
+	  	# Generate a batch of images and labels by building up a queue of examples.
+	  	return _generate_image_and_label_batch(float_image, label,
                                          min_queue_examples, batch_size,
                                          shuffle=True)
+	else: 
+		return _generate_image_and_label_for_test(float_image, label)
+
 def train(total_loss, global_step):
   	"""Train HawkNet model.
 

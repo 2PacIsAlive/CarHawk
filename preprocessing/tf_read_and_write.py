@@ -11,7 +11,7 @@ import glob
 import sys
 import os
 
-DATA_DIRECTORY = '/home/jared/CarHawk/data' 
+DATA_DIRECTORY = '/home/drivers/CarHawk/data' 
 
 def _int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
@@ -116,7 +116,58 @@ def inputs(filepath, batch_size, num_epochs):
 
 		return images, sparse_labels
 
+def read_image(path):
+	print 'reading image from', path
+	image      = []
+	reader     = tf.WholeFileReader()
+	png_files  = [path]
+	total_pngs = len(png_files)
+	png_file_q = tf.train.string_input_producer(png_files)
+	pkey, pval = reader.read(png_file_q)
+	p_image    = tf.image.decode_png(pval)
+	
+	with tf.Session() as sess:
+		coord   = tf.train.Coordinator()
+		threads	= tf.train.start_queue_runners(coord=coord)
+		for i in range(total_pngs):
+			png = p_image.eval()
+			image.append(png)
+		print 
+		coord.request_stop()
+		coord.join(threads)
+	return image[0]
+
+def convert_without_label_to(image, name):
+	rows = image.shape[0]
+	cols = image.shape[1]
+	depth = image.shape[2]
+	filename = os.path.join(DATA_DIRECTORY, 'validate/', name + '.tfrecords')
+	print 'Writing', filename
+	writer = tf.python_io.TFRecordWriter(filename)
+	image_raw = image.tostring()
+	example = tf.train.Example(features=tf.train.Features(feature={
+		'height': _int64_feature(rows),
+		'width':  _int64_feature(cols),
+		'depth':  _int64_feature(depth),
+		'image_raw': _bytes_feature(image_raw)}))
+	writer.write(example.SerializeToString())
+	writer.close()
+
 def main():
+	
+	test_images   = glob.glob('/home/drivers/CarHawk/images/test_all/*')
+	tfrecord_ids  = [path.split('/')[-1].split('.')[0] for path in glob.glob('/home/drivers/CarHawk/data/validation/*')]
+	total_imgs    = len(test_images)
+	step          = 0.0
+	for path in test_images:	
+		if path.split('/')[-1].split('.')[0] not in tfrecord_ids:
+			print 'converting', path
+			image = read_image(path)
+			convert_without_label_to(image, path.split('/')[-1].split('.')[0])
+		print step / total_imgs * 100.0
+		step += 1
+
+	'''
 	validation = read_images('/home/jared/CarHawk/images/test_all/')
 	train_c0   = read_images('/home/jared/CarHawk/images/train_all/c0')
 	train_c1   = read_images('/home/jared/CarHawk/images/train_all/c1')
@@ -152,5 +203,5 @@ def main():
 	print inputs(os.path.join(DATA_DIRECTORY, 'train_c7.tfrecords'), 128, 2) 
 	print inputs(os.path.join(DATA_DIRECTORY, 'train_c8.tfrecords'), 128, 2) 
 	print inputs(os.path.join(DATA_DIRECTORY, 'train_c9.tfrecords'), 128, 2) 
-
+	'''
 if __name__=='__main__': main()

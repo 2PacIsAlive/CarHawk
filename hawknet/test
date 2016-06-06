@@ -1,0 +1,102 @@
+#!/usr/bin/env python2
+
+'''
+adapted from https://github.com/tensorflow/tensorflow/blob/master/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py
+'''
+
+import sys
+sys.path.append('/home/drivers/CarHawk/')
+
+from preprocessing.tf_read_and_write import inputs as tf_inputs
+import tensorflow as tf
+import hawknet
+import numpy
+import time
+
+# TODO FLAGS
+LEARNING_RATE = 0.01 
+NUM_EPOCHS = 1
+
+def run_validation():
+	"""Test HawkNet on the provided testing images."""
+
+	for image_path in glob.glob('/home/jared/CarHawk/data/validation/*'):
+			
+		# Tell TensorFlow that the model will be built into the default Graph.
+		with tf.Graph().as_default():
+			# Input images and labels.
+			#images, labels = hawknet.inputs(validate   = True, 
+			#								data_dir   = '/home/drivers/CarHawk/data/', 
+			#								batch_size = 10)
+			image, label = hawknet.validation_input(image_path)
+
+			# Build a Graph that computes predictions from the inference model.
+			logits = hawknet.inference(images)
+				
+			# Add to the Graph the loss calculation.
+			loss = hawknet.loss(logits, label)
+
+			# Add to the Graph operations that train the model.
+			#train_op = hawknet.train(loss, LEARNING_RATE)
+			train_op = hawknet.train(loss, tf.Variable(LEARNING_RATE, name='learning_rate'))
+
+			# dont need
+			# The op for initializing the variables.
+			#init_op = tf.initialize_all_variables()
+
+			# set up a saver to preserve the model
+			saver = tf.train.Saver()
+
+			# Create a session for running operations in the Graph.
+			sess = tf.Session()
+
+			# load the trained model
+			saver.restore(sess, '/home/drivers/CarHawk/trained_models/HawkNet.ckpt')
+
+			#tf.train.write_graph(sess.graph_def, '/home/drivers/CarHawk/vis', 'graph.pbtxt')
+
+			summary_writer = tf.train.SummaryWriter('/home/drivers/CarHawk/vis', sess.graph_def)
+
+			# dont
+			# Initialize the variables (the trained variables and the
+			# epoch counter).
+			#sess.run(init_op)
+
+			# Start input enqueue threads.
+			coord = tf.train.Coordinator()
+			threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+			step = 0
+			start_time = time.time()
+
+			# Run one step of the model.  The return values are
+			# the activations from the `train_op` (which is
+			# discarded) and the `loss` op.  To inspect the values
+			# of your ops or variables, you may include them in
+			# the list passed to sess.run() and the value tensors
+			# will be returned in the tuple from the call.
+			predictions, _, loss_value = sess.run([logits, train_op, loss])
+			
+			for prediction in predictions:
+				print numpy.argmax(prediction), prediction
+
+			duration = time.time() - start_time
+
+			print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value,
+													 duration))
+					
+			# When done, ask the threads to stop.
+			coord.request_stop()
+
+		# Wait for threads to finish.
+			coord.join(threads)
+			
+			# save everything
+			#save_path = saver.save(sess, '/home/jared/CarHawk/trained_models/HawkNet.ckpt')	
+			#print 'Model saved to', save_path
+		
+		sess.close()
+
+def main(_): run_validation()
+
+if __name__=='__main__': tf.app.run()

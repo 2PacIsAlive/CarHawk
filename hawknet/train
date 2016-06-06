@@ -14,7 +14,7 @@ import time
 
 # TODO FLAGS
 LEARNING_RATE = 0.01 
-NUM_EPOCHS = 100
+NUM_EPOCHS = 1
 
 def run_training():
 	"""Train HawkNet for a number of steps."""
@@ -24,7 +24,7 @@ def run_training():
 		# Input images and labels.
 		images, labels = hawknet.inputs(validate   = False, 
 										data_dir   = '/home/jared/CarHawk/data/', 
-										batch_size = 1)
+										batch_size = 3)
 
 		# Build a Graph that computes predictions from the inference model.
 		logits = hawknet.inference(images)
@@ -38,6 +38,9 @@ def run_training():
 
 		# The op for initializing the variables.
 		init_op = tf.initialize_all_variables()
+
+		# set up a saver to preserve the model
+		saver = tf.train.Saver()
 
 		# Create a session for running operations in the Graph.
 		sess = tf.Session()
@@ -55,7 +58,7 @@ def run_training():
       		while not coord.should_stop():
         		start_time = time.time()
 
-				# Run one step of the model.  The return values are
+			# Run one step of the model.  The return values are
         		# the activations from the `train_op` (which is
         		# discarded) and the `loss` op.  To inspect the values
         		# of your ops or variables, you may include them in
@@ -70,14 +73,19 @@ def run_training():
           			print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value,
                                                      duration))
         		step += 1
-    	except tf.errors.OutOfRangeError:
+    	except (KeyboardInterrupt, tf.errors.OutOfRangeError):
       		print('Done training for %d epochs, %d steps.' % (NUM_EPOCHS, step))
     	finally:
       		# When done, ask the threads to stop.
       		coord.request_stop()
 
     	# Wait for threads to finish.
-    	coord.join(threads)
+		coord.join(threads)
+		
+		# save everything
+		save_path = saver.save(sess, '/home/jared/CarHawk/trained_models/HawkNet.ckpt')	
+		print 'Model saved to', save_path
+	
     	sess.close()
 
 def main(_): run_training()
